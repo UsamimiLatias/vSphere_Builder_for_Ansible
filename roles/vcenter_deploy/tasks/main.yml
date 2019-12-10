@@ -1,0 +1,107 @@
+---
+- name: '[ACTION:PUSH_TEMPLATE]'
+  vmware_deploy_ovf:
+    hostname:                   '{{ vcenter_hostname }}'
+    username:                   '{{ vcenter_username }}'
+    password:                   '{{ vcenter_password }}'
+    datacenter:                 '{{ datacenter }}'
+    cluster:                    '{{ cluster }}'
+    datastore:                  '{{ item.dst }}'
+    name:                       '{{ item.template }}'
+    folder:                     '{{ item.save_as }}'
+    power_on: no
+    networks:                   '{{ export_nic }}'
+    ovf:                        '{{ item.image_path }}'
+    validate_certs: no
+  delegate_to: localhost
+  with_items:
+    - '{{ Template }}'
+
+- name: '[ACTION:DEPLOY_VM]'
+  vmware_guest:
+    # vCenter Setting
+    state:                      '{{ status      | default('present')}}'
+    hostname:                   '{{ vcenter_hostname }}'
+    username:                   '{{ vcenter_username }}'
+    password:                   '{{ vcenter_password }}'
+    validate_certs:             'no'
+    datacenter:                 '{{ datacenter }}'
+    datastore:                  '{{ datastore }}'
+    cluster:                    '{{ cluster }}'
+    folder:                     '{{ deploy_folder }}'
+
+    # VM Setting
+    name:                       '{{ inventory_hostname }}'
+    convert:                    '{{ disk_type }}'
+    template:                   '{{ template }}'
+    hardware:
+      memory_mb:                '{{ memory_mb   | default('4096') }}'
+      nested_virt:              '{{ nested_virt | default('hvOff') }}'
+      num_cpus:                 '{{ num_cpus    | default('2') }}'
+      num_cpu_cores_per_socket: '{{ num_cpus    | default('2') }}'
+      boot_firmware:            '{{ bootfirm    | default('bios') }}'
+    disk:
+      - size_gb:                '{{ disk_size }}'
+        datastore:              '{{ datastore }}'
+    networks:                   '{{ export_nic }}'
+
+    # VMware Tools customization
+    customization:
+      productid:                '{{ license }}'
+      autologon:                True
+      autologoncount:           1
+      fullname:                 '{{ ansible_user }}'
+      password:                 '{{ ansible_password }}'
+      # domain_admin:           ''
+      # domainadminpassword:    ''
+      # dns_servers:
+      # - 192.168.1.100
+      # domain:                 '{{ domain_name }}'
+      runonce:
+        - netsh advfirewall set allprofiles state off
+        - powershell.exe -ExecutionPolicy RemoteSigned -Command "winrm qc -Force "
+        - powershell.exe -ExecutionPolicy RemoteSigned -Command "Enable-PSRemoting -Force" 
+        - powershell.exe -ExecutionPolicy RemoteSigned -Command "Set-ExecutionPolicy RemoteSigned -Force"
+        - reg add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\PoliciesSystem /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 1 /f 
+        - winrm set winrm/config/service/auth @{Basic="true"}
+        - winrm set winrm/config/service @{AllowUnencrypted="true"}
+  delegate_to: localhost
+
+- name: '[ACTION:DEPLOY_NIC]'
+  vmware_guest:
+    # vCenter Setting
+    state:                      '{{ status      | default('present')}}'
+    hostname:                   '{{ vcenter_hostname }}'
+    username:                   '{{ vcenter_username }}'
+    password:                   '{{ vcenter_password }}'
+    validate_certs:             'no'
+    datacenter:                 '{{ datacenter }}'
+    datastore:                  '{{ datastore }}'
+    cluster:                    '{{ cluster }}'
+    folder:                     '{{ target }}'
+    # VM Setting
+    name:                       '{{ inventory_hostname }}'
+    networks:                   '{{ export_nic }}'
+  delegate_to:                  localhost
+
+- name: '[ACTION:DEPLOY_EXTEND_DISK]'
+  when: 'export_disk is defined'
+  vmware_guest_disk:
+    hostname:                   "{{ vcenter_hostname }}"
+    username:                   "{{ vcenter_username }}"
+    password:                   "{{ vcenter_password }}"
+    datacenter:                 "{{ datacenter }}"
+    validate_certs:             no
+    name:                       '{{ inventory_hostname }}'
+    disk:                       '{{ export_disk }}'
+  delegate_to:                  localhost
+
+- name: '[ACTION:POWER_ON_VM]'
+  vmware_guest_powerstate :
+    state:                      'powered-on'
+    hostname:                   '{{ vcenter_hostname }}'
+    username:                   '{{ vcenter_username }}'
+    password:                   '{{ vcenter_password }}'
+    validate_certs:             'no'
+    name:                       '{{ inventory_hostname }}'
+  delegate_to: localhost

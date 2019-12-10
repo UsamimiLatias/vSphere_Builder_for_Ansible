@@ -1,0 +1,12 @@
+---
+- name: '[ACTION:Install Appliance from auto unattendant installer]'
+  win_copy:
+    src: example.bat
+    dest: C:\Ansible\
+    force: yes
+  register: result
+- win_shell: C:\Ansible\example.bat
+  when: result is changed
+  register: result
+- win_reboot:
+  when: result is changed

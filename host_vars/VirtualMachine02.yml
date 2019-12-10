@@ -1,0 +1,41 @@
+---
+export_nic:
+  - name:           "VLAN_100"
+    type:           "static"
+    dvswitch_name:  "DS_Service"
+    device_type:    "vmxnet3"
+    ip:             "192.168.1.2"
+    netmask:        "255.255.255.0"
+    gateway:        ""
+    start_connected: yes
+    allow_guest_control: yes
+  - name:           "VLAN209_Skype"
+    type:           "static"
+    dvswitch_name:  "DS_Service"
+    device_type:    "vmxnet3"
+    ip:             "192.168.100.1"
+    netmask:        "255.255.255.0"
+    gateway:        "192.168.100.200"
+    start_connected: yes
+    allow_guest_control: yes
+
+win_nic:
+  - adapter:        "vmxnet3 イーサネット アダプタ"
+    ip:             "192.168.1.2"
+    netmask:        "255.255.255.0"
+    gateway:        ""
+    fulladdr:       "192.168.1.2/255.255.255.0"
+  - adapter:        "vmxnet3 イーサネット アダプタ #3"
+    ip:             "192.168.100.1"
+    netmask:        "255.255.255.0"
+    gateway:        "192.168.100.200"
+    fulladdr:       "192.168.100.1/255.255.255.0"
+
+export_disk:
+  - size_gb:          50
+    type:             'thick'
+    datastore:        'Datastore_East03'
+    state:            'present'
+    scsi_controller:  '0'
+    unit_number:      '1'
+    scsi_type:        'paravirtual'

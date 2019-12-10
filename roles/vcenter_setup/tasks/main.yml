@@ -1,0 +1,124 @@
+---
+# - name: '[ACTION:AUTH] VCSA License'
+#   vcenter_license:
+#     hostname:         '{{ vcenter_hostname }}'
+#     username:         '{{ vcenter_username }}'
+#     password:         '{{ vcenter_password }}'
+#     license:          '{{ license_code }}'
+#     validate_certs:   no
+#     state:            present
+#   delegate_to:        localhost
+
+
+
+- name: '[ACTION:CREATE] Datacenter'
+  vmware_datacenter:
+    hostname:         '{{ vcenter_hostname }}'
+    username:         '{{ vcenter_username }}'
+    password:         '{{ vcenter_password }}'
+    datacenter_name:  '{{ datacenter }}'
+    validate_certs:   no
+    state:            present
+  delegate_to:        localhost
+
+
+
+- name: '[ACTION:CREATE] Cluster'
+  vmware_cluster:
+    hostname:         '{{ vcenter_hostname }}'
+    username:         '{{ vcenter_username }}'
+    password:         '{{ vcenter_password }}'
+    datacenter_name:  '{{ datacenter }}'
+    cluster_name:     '{{ cluster }}'
+    enable_ha:        no
+    enable_drs:       yes
+    enable_vsan:      yes
+    vsan_auto_claim_storage: yes
+    validate_certs:   no
+  delegate_to:        localhost
+
+
+
+- name: '[ACTION:CREATE] Folder'
+  when: Folder is defined
+  vcenter_folder:
+    hostname:         '{{ vcenter_hostname }}'
+    username:         '{{ vcenter_username }}'
+    password:         '{{ vcenter_password }}'
+    datacenter_name:  '{{ datacenter }}'
+    folder_name:      '{{ item.name }}'
+    folder_type:      '{{ item.type }}'
+    state:            '{{ item.  state }}'
+    validate_certs:   no
+  delegate_to:        localhost
+  with_items:
+    - '{{ Folder }}'
+
+
+
+- name: '[ACTION:CREATE] Resource Pool'
+  when: Resource_pool is defined
+  vmware_resource_pool:
+    hostname:         '{{ vcenter_hostname }}'
+    username:         '{{ vcenter_username }}'
+    password:         '{{ vcenter_password }}'
+    datacenter:       '{{ datacenter }}'
+    cluster:          '{{ cluster }}'
+    resource_pool:    '{{ item.name }}'
+    # memory
+    mem_shares:       '{{ item.mem.share }}'
+    mem_limit:        '{{ item.mem.limit }}'
+    mem_reservation:  '{{ item_mem.reservation }}'
+    mem_expandable_reservations: yes
+    # cpu
+    cpu_shares:       '{{ item.cpu.share }}'
+    cpu_limit:        '{{ item.cpu.limit }}'
+    cpu_reservation:  '{{ item.cpu.reservation }}'
+    cpu_expandable_reservations: yes
+    state:            present
+    validate_certs:   no
+  delegate_to:        localhost
+  with_items:
+    - '{{ Resource_pool }}'
+
+
+
+- name: '[ACTION:CREATE] Portgroup'
+  when: Port_group is defined
+  vmware_portgroup:
+    hostname:       '{{ vcenter_hostname }}'
+    username:       '{{ vcenter_username }}'
+    password:       '{{ vcenter_password }}'
+    cluster_name:   '{{ cluster }}'
+    switch_name:    '{{ item.vswitch }}'
+    portgroup_name: '{{ item.pg_name }}'
+    vlan_id:        '{{ item.vlan_id }}'
+    validate_certs: no
+    state:          '{{ item.state }}'
+  delegate_to:      localhost
+  with_items:
+    - '{{ Port_group }}'
+
+
+
+# - name: Create datastore cluster
+#   vmware_datastore_cluster:
+#     hostname: '{{ vcenter_hostname }}'
+#     username: '{{ vcenter_username }}'
+#     password: '{{ vcenter_password }}'
+#     datacenter_name: '{{ datacenter }}'
+#     datastore_cluster_name: '{{ datastore }}'
+#     state: present
+#     validate_certs: no
+#   delegate_to: localhost
+
+
+
+# - name: Configure VSAN
+#   vmware_vsan_cluster:
+#     hostname: '{{ ansible_host }}'
+#     username: '{{ esxi_user }}'
+#     password: '{{ esxi_password }}'
+#     validate_certs: no
+#   delegate_to: localhost
+#   register: vsan_cluster

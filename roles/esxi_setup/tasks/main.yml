@@ -1,0 +1,26 @@
+---
+# - name: '[ACTION:AUTH] ESXi License'
+#   vcenter_license:
+#     hostname:         '{{ ansible_host }}'
+#     username:         '{{ ansible_user }}'
+#     password:         '{{ ansible_password }}'
+#     license:          '{{ license_code }}'
+#     validate_certs:   no
+#     state:            present
+#   delegate_to:        localhost
+
+
+
+- name: '[ACTION:ADD] ESXi hosts to VCSA'
+  vmware_host:
+    hostname:         '{{ vcenter_hostname }}'
+    username:         '{{ vcenter_username }}'
+    password:         '{{ vcenter_password }}'
+    datacenter:       '{{ datacenter }}'
+    cluster_name:     '{{ cluster }}'
+    esxi_hostname:    '{{ ansible_host }}'
+    esxi_username:    '{{ esxi_user }}'
+    esxi_password:    '{{ esxi_password }}'
+    state:            present
+    validate_certs:   no
+  delegate_to:        localhost

@@ -1,0 +1,25 @@
+---
+- hosts: 
+    - vSphere_VirtualMachine
+  gather_facts: no
+  connection: localhost
+  roles:
+    - init_environment
+
+# - hosts: localhost
+#   gather_facts: no
+#   roles:
+#     - vcenter_setup
+
+# - hosts: ESXi_hosts
+#   gather_facts: no
+#   roles:
+#     - esxi_setup
+
+# - hosts: 
+#     - vSphere_VirtualMachine
+#   gather_facts: yes
+#   roles:
+#     - win_setup
+#     - win_custom
+

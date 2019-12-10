@@ -1,0 +1,148 @@
+---
+all:
+  children:
+    ESXi_hosts:
+      hosts:
+        esxi01:
+          ansible_host:               10.20.30.100        
+        esxi02:
+          ansible_host:               10.20.30.101
+        esxi03:
+          ansible_host:               10.20.30.102
+        esxi04:
+          ansible_host:               10.20.30.103
+        esxi05:
+          ansible_host:               10.20.30.104
+        esxi06:
+          ansible_host:               10.20.30.105
+        esxi07:
+          ansible_host:               10.20.30.106
+        esxi08:
+          ansible_host:               10.20.30.107
+        esxi09:
+          ansible_host:               10.20.30.108
+  
+    vSphere_VirtualMachine:
+      hosts:
+        VirtualMachine01:
+          ansible_host:               192.168.1.1
+        VirtualMachine02:
+          ansible_host:               192.168.1.2
+      vars:
+        # Machine status
+        status:                       present
+        datastore:                    'Datastore_East03'
+        target:                       /VirtualMachine/
+
+        # Hardware status
+        num_cpus:                     12
+        nested_virt:                  'hvOn'
+        memory_mb:                    32768
+        disk_size:                    120
+        pagefile:
+          - drive:                    C
+            page_size:                '{{ (memory_mb+300)|int|abs }}'
+        extend_disk:
+          - Part: { 
+              unit_number:          1, 
+              partition_style:      "GPT", 
+              letter:               "D", 
+              partition_size:       -1, 
+              fs_type:              NTFS 
+            }
+            Disk: {               
+              unit_number:          1,
+              scsi_controller:      0, 
+              datastore:            '{{ datastore }}', 
+              size_gb:              50, 
+
+              state:                'present', 
+              type:                 'thick'
+            }
+        extend_network:
+          - names: { 
+              adapter:              'vmxnet3 イーサネット アダプタ #3' , 
+              nic_name:             'Skype'
+            }
+            interface: { 
+              name:                 'VLAN209_Skype', 
+              dvswitch_name:        'DS_Service', 
+              device_type:          'vmxnet3', 
+              ip:                   192.168.100.1, 
+              netmask:              255.255.255.0, 
+              gateway:              192.168.100.200, 
+              start_connected:      true
+            }
+            dnslist: [ 
+                                    "10.52.1.51",
+                                    "10.52.1.52" 
+            ]
+
+  # All group vars
+  vars:
+    # VCSA resource
+    vcenter_hostname:                 '192.168.1.254'
+    vcenter_username:                 'vsphere-username@vsphere.local'
+    vcenter_password:                 'PA$$wd1910'
+    datacenter:                       'Datacenter'
+    cluster:                          'Cluster'
+    datastore:                        'Datastore1'
+
+    # Folder:
+    #   - name:                         'VirtualMachine'
+    #     type:                         'vm'
+    #     state:                        'present'
+    #   - name:                         'TemplateMachine' 
+    #     type:                         'vm'
+    #     state:                        'present'
+
+    # Resource_pool:
+    #   - name:                         'CriticalResources'
+    #     memory: {
+    #       shares:                     normal,
+    #       limit:                      -1,
+    #       reservation:                0,
+    #       expandable_reservations:    yes
+    #     }
+    #     cpu: {
+    #       shares:                     normal,
+    #       limit:                      -1,
+    #       reservation:                0,
+    #       expandable_reservations:    yes
+    #     }
+    #     state:                        'present'
+
+    # Port_group:
+    #   - pg_name:                      'VM Network'
+    #     vswitch:                      'vSwitch0'
+    #     vlan_id:                      0
+    #     state:                        'present'
+    #   - pg_name:                      'Default'
+    #     vswitch:                      'vSwitch0' 
+    #     vlan_id:                      1
+    #     state:                        'present'
+
+    # Template:
+    #   - template:                     'WindowsServer2016'
+    #     image_path:                   '{{ inventory_dir }}/ova/WindowsServer2016.ovf'
+    #     dst:                          'datastore1'
+
+    # OS resource ()
+    ansible_user:                     'Administrator'
+    ansible_password:                 'Password123456789'
+    base_network:
+      - names: { 
+          adapter:                    'vmxnet3 イーサネット アダプタ' , 
+          nic_name:                   'Ethernet'
+        }
+        interface: { 
+          name:                       'VLAN_100', 
+          dvswitch_name:              'DS_Service', 
+          device_type:                'vmxnet3', 
+          ip:                         '{{ ansible_host }}', 
+          netmask:                    '255.255.255.0', 
+          gateway:                    '', 
+          start_connected:            true
+        }
+        dnslist: [ 
+        ]

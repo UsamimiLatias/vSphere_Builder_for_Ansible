@@ -1,0 +1,300 @@
+---
+## This role is Windows standard setting division.
+## If customize thirdparty appliance, please change to win_custom roles.
+## Attention: Need edit to registry, Must do after win_feature.(warning reset registry)
+
+
+
+# - name: '[ACTION:Network] Change InterfaceName'
+#   changed_when: 'item.names.nic_name not in result.stdout_lines'
+#   ignore_errors: yes
+#   win_command: powershell.exe -
+#   args:
+#     stdin: Get-NetAdapter -InterfaceDescription "{{ item.names.adapter }}" | Rename-NetAdapter -NewName "{{ item.names.nic_name }}"; Get-NetAdapter -InterfaceDescription "{{ item.names.adapter }}" | Select-Object Name
+#   register: result
+#   with_items:
+#     - '{{ BaseNetwork }}'
+# - win_command: powershell.exe -
+#   args:
+#     stdin: netsh interface ip set address "{{ item.names.nic_name }}" static {{ item.interface.ip }}  {{ item.out_going.netmask }} {{ item.out_going.gateway }}
+#   with_items:
+#     - '{{ BaseNetwork }}'
+#   async: 15
+#   poll:  0
+# - wait_for_connection:
+#     delay: 5
+#     timeout: 600
+# - win_dns_client:
+#     adapter_names: Operation
+#     ipv4_addresses: '{{ item.out_going.gateway }}'
+#   with_items:
+#     - '{{ BaseNetwork }}'
+
+
+- name: '[ACTION:HOST_NAME]'
+  changed_when: '"task_succeed" in result.stdout_lines'
+  win_command: powershell.exe -
+  args:
+    stdin: if( ${ENV:COMPUTERNAME} -ne "{{ inventory_hostname }}" ) { Rename-Computer -NewName "{{ inventory_hostname }}" -Force; echo task_succeed }else{ echo OK }
+  register: result
+
+
+
+- name: "[ACTION:DNS_RegisterThisConnectionsAddress_only_added_default_gateway]"
+  win_command: powershell.exe - 
+  args:
+    stdin: Get-NetAdapter -InterfaceDescription "{{ item.names.adapter }}" | Set-DnsClient -RegisterThisConnectionsAddress:$False
+  with_items:
+    - '{{ network_list }}'
+- when: '"" != item.interface.gateway'
+  win_command: powershell.exe - 
+  args:
+    stdin: Get-NetAdapter -InterfaceDescription "{{ item.names.adapter }}" | Set-DnsClient -RegisterThisConnectionsAddress:$True
+  with_items:
+    - '{{ network_list }}'
+- name: '[ACTION:DNS_LIST]'
+  win_dns_client:
+    adapter_names:  '{{ item.names.nic_name }}'
+    ipv4_addresses: '{{ item.dnslist }}'
+  with_items:
+    - '{{ network_list }}'
+
+
+
+- name: '[ACTION:SYSTEM_DISK]'
+  when: disk_size is defined
+  win_partition:
+    drive_letter:     C
+    partition_size:   -1  # Full size : -1
+    partition_number: 4   # check bring your customized diskpart
+    disk_number:      0
+
+
+
+- name: '[ACTION:EXTEND_DISK]'
+  when: extend_disk is defined
+  win_command: powershell.exe -
+  args:
+    stdin: Set-Disk -Number {{ item.Part.unit_number }} -IsOffline $false
+  with_items:
+    - '{{ extend_disk }}'
+- when: extend_disk is defined
+  win_command: powershell.exe -
+  changed_when: "False" in result.stdout
+  args:
+    stdin: Test-Path {{ item.Part.letter }}:\
+  with_items:
+    - '{{ extend_disk }}' 
+  register: result
+- when: "False" in result.stdout
+  win_command: powershell.exe -
+  args:
+    stdin: Initialize-Disk -Number {{ item.Part.unit_number }} -PartitionStyle {{ item.Part.partition_style }} -PassThru
+  with_items:
+    - '{{ extend_disk }}'
+- when: "False" in result.stdout
+  win_partition:
+    drive_letter:   '{{ item.Part.letter }}'
+    partition_size: '{{ item.Part.partition_size }}'
+    disk_number:    '{{ item.Part.unit_number }}'
+    state:          present
+    offline:        no
+    read_only:      no
+  with_items:
+    - '{{ extend_disk }}' 
+- when: "False" in result.stdout
+  win_format:
+    drive_letter: '{{ item.Part.letter }}'
+    file_system:  '{{ item.Part.fs_type }}'
+    new_label:    ''
+    full:         false
+  with_items:
+    - '{{ extend_disk }}'
+
+
+
+- name: '[ACTION:LICENSE]'
+  win_product_facts:
+  register: check_license
+- when: ansible_os_license_status != 'Licensed'
+  win_command: powershell.exe -
+  args:
+    stdin: cscript //Nologo $ENV:SystemRoot\System32\slmgr.vbs /ipk {{ license }}
+- when: ansible_os_license_status != 'Licensed'
+  win_command: powershell.exe -
+  args:
+    stdin: cscript //Nologo $ENV:SystemRoot\System32\slmgr.vbs /ato
+- failed_when: ansible_os_license_status  != 'Licensed'
+  win_product_facts:
+  register: check_license
+
+
+
+- name: '[ACTION:TIME_ZONE] Set timezone'
+  win_timezone:
+    timezone: Tokyo Standard Time
+  register: time_zone
+  ## See more:
+  ## https://docs.microsoft.com/en-us/previous-versions/windows/embedded/ms912391(v=winembedded.11)?redirectedfrom=MSDN
+
+
+
+- name: '[ACTION:RDP] Set to Enable'
+  win_regedit:
+    path: 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
+    name: 'fDenyTSConnections'
+    type: dword
+    data: 0
+- name: '[ACTION:RDP] Enabled UserAuthentication'
+  win_regedit:
+    path: 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
+    name: 'UserAuthentication'
+    type: dword
+    data: 1
+
+
+
+- name: '[ACTION:VirtualMemory] Set pagefile size'
+  win_pagefile:
+    drive:        '{{ item.drive }}'
+    remove_all:   true
+  with_items:
+    - '{{ pagefile }}'
+- when: 'item.page_size is defined'
+  win_pagefile:
+    drive:        '{{ item.drive }}'
+    initial_size: '{{ page_size }}'
+    maximum_size: '{{ page_size }}'
+    state:        present
+  with_items:
+    - '{{ pagefile }}'
+
+
+
+- name: '[ACTION:UAC] Set to Disabled'
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\policies\system
+    name: '{{ item }}'
+    type: dword
+    data: 0
+  with_items:
+    - EnableLUA
+    - ConsentPromptBehaviorAdmin
+    - PromptOnSecureDesktop
+
+
+
+- name: '[ACTION:RAM_Dump] Memory dump action status'
+  changed_when: '"successful." not in result.stdout'
+  win_command: powershell.exe -
+  args:
+    stdin: wmic RECOVEROS set DebugInfoType={{ stat | default('7') }}
+  register: result
+  vars:
+    # Fulldump
+    stat: 1
+    ## Auto(Default)
+    # stat: 7 
+
+
+
+- name: '[ACTION:POWER_PLAN] Power plan status'
+  win_power_plan:
+    name: '{{ stat | default('バランス') }}'
+  vars:
+    # # Power save
+    # stat: '省電力'
+    # Balance (Default)
+    stat: 'バランス'
+    # # High performance
+    # stat: '高パフォーマンス'
+
+
+
+- name: '[ACTION:IE ECS_Admin] Set to Disable'
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}
+    name: IsInstalled
+    type: dword
+    data: 0
+- name: '[ACTION:IE ECS_User] Set to Enable'
+  win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}
+    name: IsInstalled
+    type: dword
+    data: 1
+
+
+
+- name: '[ACTION:SNP] Set to Disabled all'
+  win_command: powershell.exe -
+  args:
+    stdin: netsh int tcp set global {{ item }}=disabled
+  with_items:
+    - rss
+    - chimney
+    - netdma
+- failed_when: 'item in result.stdout'
+  win_command: powershell.exe -
+  args:
+    stdin: netsh int tcp show global | Select-String {{ item }}
+  with_items:
+    - 'Receive-Side Scaling'
+    - 'Chimney'
+    - 'NetDMA'
+  register: result
+
+
+
+- name: '[ACTION:SMB MultiChannel_Server] Set to False'
+  failed_when:  '"False" in result.stdout'
+  changed_when: '"False" not in result.stdout'
+  win_command: powershell.exe -
+  args:
+    stdin: Set-SmbServerConfiguration -EnableMultiChannel:$false -Force; Get-SmbClientConfiguration > ./result; Get-Content ./result | Select-String "EnableMultiChannel" | Select-String "False"
+  register: result
+- name: '[ACTION:SMB MultiChannel_Client] Set to False'
+  failed_when:  '"False" in result.stdout'
+  changed_when: '"False" not in result.stdout'
+  win_command: powershell.exe -
+  args:
+    stdin: Set-SmbClientConfiguration -EnableMultiChannel:$false -Force; Get-SmbClientConfiguration > ./result; Get-Content ./result | Select-String "EnableMultiChannel" | Select-String "False"
+  register: result
+
+
+
+- name: '[ACTION:LocalGroupPolicy] Disabled Administrator passwordexpires'
+  failed_when:  '"failed" in result.stdout'
+  changed_when: '"successful" not in result.stdout'
+  win_command: cmd.exe - 
+  args:
+    stdin: wmic UserAccount where Name="Administrator" set PasswordExpires=False
+  register: result
+
+
+
+- name: '[ACTION:WindowsUpdate] Install from files'
+  win_file:
+    path: C:\Ansible\WindowsUpdates
+    state: directory
+- win_copy:
+    src: '{{ item }}'
+    dest: "C:\Ansible\WindowsUpdates"
+    force: yes
+  with_items:
+    - '{{ hotfix }}'
+- win_hotfix:
+    source: 'C:\Ansible\{{ item }}'
+    state: present
+  with_items:
+    - '{{ hotfix }}'
+- win_reboot:
+
+
+- name: '[ACTION:WindowsFeatuer] Setup Windows Feature'
+  when: windows_feature_set is defined
+  win_feature:
+    name:   "{{ item }}"
+    state:  present
+  with_items:
+    - "{{ windows_feature_set }}"
